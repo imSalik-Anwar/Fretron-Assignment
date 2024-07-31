@@ -22,15 +22,15 @@ public class NoAccidentApplication {
 	public static void printPaths() throws Exception {
 		Scanner scanner = new Scanner(System.in);
 
-		// Read input for Flight 1
+		// Read coordinates for Flight 1
 		System.out.println("Enter coordinates for Flight 1 (format: x y, enter 'done' to finish):");
 		List<int[]> flight1 = readCoordinates(scanner);
 
-		// Read input for Flight 2
+		// Read coordinates for Flight 2
 		System.out.println("Enter coordinates for Flight 2 (format: x y, enter 'done' to finish):");
 		List<int[]> flight2 = readCoordinates(scanner);
 
-		// Read input for Flight 3
+		// Read coordinates for Flight 3
 		System.out.println("Enter coordinates for Flight 3 (format: x y, enter 'done' to finish):");
 		List<int[]> flight3 = readCoordinates(scanner);
 
@@ -39,18 +39,14 @@ public class NoAccidentApplication {
 		Set<String> occupiedByFlight2 = new HashSet<>();
 		Set<String> occupiedByFlight3 = new HashSet<>();
 
-		// Track coordinates and segments occupied by flights
-		Set<String> occupiedCoordinates = new HashSet<>();
-		Set<String> occupiedSegments = new HashSet<>();
-
 		// Process Flight 1
-		List<int[]> adjustedFlight1 = processFlight(flight1, occupiedCoordinates, occupiedSegments);
+		List<int[]> adjustedFlight1 = processFlight(flight1, occupiedByFlight1);
 
 		// Process Flight 2
-		List<int[]> adjustedFlight2 = processFlight(flight2, occupiedCoordinates, occupiedSegments);
+		List<int[]> adjustedFlight2 = processFlight(flight2, occupiedByFlight1, occupiedByFlight2);
 
 		// Process Flight 3
-		List<int[]> adjustedFlight3 = processFlight(flight3, occupiedCoordinates, occupiedSegments);
+		List<int[]> adjustedFlight3 = processFlight(flight3, occupiedByFlight1, occupiedByFlight2, occupiedByFlight3);
 
 		// Create dataset
 		XYSeriesCollection dataset = new XYSeriesCollection();
@@ -100,16 +96,26 @@ public class NoAccidentApplication {
 		return coordinates;
 	}
 
-	private static List<int[]> processFlight(List<int[]> flight, Set<String> occupiedCoordinates, Set<String> occupiedSegments) {
+	private static List<int[]> processFlight(List<int[]> flight, Set<String>... occupiedSets) {
 		List<int[]> adjustedFlight = new ArrayList<>();
+		Set<String> occupied = new HashSet<>();
+
+		// Add initial coordinate to the path
 		int[] start = flight.get(0);
 		adjustedFlight.add(start);
-		occupiedCoordinates.add(start[0] + "," + start[1]);
+		occupied.add(start[0] + "," + start[1]);
 
+		// Add coordinates from all sets
+		for (Set<String> set : occupiedSets) {
+			occupied.addAll(set);
+		}
+
+		// Iterate through each coordinate, starting from the second one
 		for (int i = 1; i < flight.size(); i++) {
 			int[] next = flight.get(i);
 			int[] previous = adjustedFlight.get(i - 1);
 
+			// Move step by step towards the next coordinate
 			int x = previous[0];
 			int y = previous[1];
 			while (x != next[0] || y != next[1]) {
@@ -118,30 +124,26 @@ public class NoAccidentApplication {
 				else if (y < next[1]) y++;
 				else if (y > next[1]) y--;
 
-				String currentSegment = previous[0] + "," + previous[1] + "-" + x + "," + y;
-				if (occupiedSegments.contains(currentSegment)) {
-					// Adjust the path if needed
-					while (occupiedCoordinates.contains(x + "," + y) || occupiedSegments.contains(currentSegment)) {
-						if (y < next[1] || y == previous[1]) y++;
-						else if (y > next[1]) y--;
-						else if (x < next[0] || x == previous[0]) x++;
-						else if (x > next[0]) x--;
-						currentSegment = previous[0] + "," + previous[1] + "-" + x + "," + y;
-					}
+				// Adjust path if it intersects with another flight
+				while (occupied.contains(x + "," + y)) {
+					if (y < next[1] || y == previous[1]) y++;
+					else if (y > next[1]) y--;
+					else if (x < next[0] || x == previous[0]) x++;
+					else if (x > next[0]) x--;
 				}
 
 				adjustedFlight.add(new int[]{x, y});
-				occupiedCoordinates.add(x + "," + y);
-				occupiedSegments.add(currentSegment);
-				previous = new int[]{x, y};
+				occupied.add(x + "," + y);
 			}
 
+			// Add the destination to the path
 			adjustedFlight.add(next);
-			occupiedCoordinates.add(next[0] + "," + next[1]);
+			occupied.add(next[0] + "," + next[1]);
 		}
 
 		return adjustedFlight;
 	}
+
 	private static XYSeries createXYSeries(String label, List<int[]> path) {
 		XYSeries series = new XYSeries(label);
 		for (int[] coord : path) {
